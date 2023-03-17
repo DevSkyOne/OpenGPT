@@ -39,7 +39,17 @@
 
 ## About The Project
 
-Coming soon...
+OpenGPT Discord Bot is an interactive Discord bot built to communicate with OpenAI's ChatGPT-4 API. This project aims to bring the power and convenience of ChatGPT-4 to Discord servers, allowing users to engage in conversations, ask questions, or seek information from a highly advanced AI language model.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+### Features
+
+Interact with ChatGPT-4 by simply mentioning the bot using @OpenGPT or replying to a recent message from the bot.
+Accessible and user-friendly, with a daily limit of 100 Credits (equivalent to ~10 cents) per user to manage API costs.
+
+Invite the official bot to your server with ease using this link: [Official discord bot invite](https://discord.com/api/oauth2/authorize?client_id=646411900267135004&permissions=274877975552&scope=bot%20applications.commands)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -49,7 +59,6 @@ Coming soon...
 * [![discord4py][discord4py]][discord4py-url]
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 
 
 <!-- GETTING STARTED -->
@@ -73,8 +82,6 @@ You need the following software to run this plugin:
 4. Start the bot with `python opengpt.py` 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 <!-- ROADMAP -->
 
@@ -129,6 +136,15 @@ Don't forget to give the project a star! Thanks again!
 Distributed under the MIT License. See `LICENSE` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+## Support & Sponsorship
+
+The OpenGPT Discord Bot project is actively maintained and improved. Your support and sponsorship on GitHub directly contribute to the ongoing development and maintenance of the project. By sponsoring, you help ensure that the bot continues to provide users with a seamless and engaging ChatGPT-4 experience on Discord.
+
+Sponsor the project here: [GitHub Sponsorship Page](https://github.com/sponsors/CoasterFreakDE)
+
+Please don't hesitate to open issues or submit pull requests for any improvements or bug fixes. Your contributions are always welcome!
 
 
 
