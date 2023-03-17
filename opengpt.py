@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import os
+import re
 import sqlite3
 from pathlib import Path
 
@@ -141,6 +142,21 @@ str, int):
                             thinking_message_content += f"\n\n{full_response[:1600]}...\n\n" \
                                                         f"*...truncated* (Please wait for the full response.)"
 
+                        # Filter out mentions
+                        thinking_message_content = thinking_message_content.replace(f"@everyone", "@ everyone")
+                        thinking_message_content = thinking_message_content.replace(f"@here", "@ here")
+                        ping_regex = re.compile(r"<@!?[0-9]+>")
+
+                        # Find all user mentions and replace them with obfuscated text
+                        def replace_mention(match):
+                            mention = match.group(0)
+                            if mention.startswith("<"):
+                                return "**@**user"
+                            else:
+                                return mention
+
+                        thinking_message_content = ping_regex.sub(replace_mention, thinking_message_content)
+
                         await thinking_message.edit(content=thinking_message_content)
 
     response_tokens = enc.encode(full_response)
@@ -163,6 +179,22 @@ async def delete_thinking_message(wait_message):
 
 
 async def send_response(message, response):
+
+    # Filter out mentions
+    response = response.replace(f"@everyone", "@ everyone")
+    response = response.replace(f"@here", "@ here")
+    ping_regex = re.compile(r"<@!?[0-9]+>")
+
+    # Find all user mentions and replace them with obfuscated text
+    def replace_mention(match):
+        mention = match.group(0)
+        if mention.startswith("<"):
+            return "**@**user"
+        else:
+            return mention
+
+    response = ping_regex.sub(replace_mention, response)
+
     def adjust_chunks(responses_chunks):
         for i in range(len(responses_chunks) - 1):
             # Check for code blocks
@@ -241,7 +273,6 @@ async def generate_answer(context, message, thinking_message):
     if not response_text:
         response_text = "I don't know what to say."
     await send_response(message, response_text)
-    await message.channel.send(f"Response generated using {sky_credits} credits.")
     await delete_thinking_message(thinking_message)
 
 
