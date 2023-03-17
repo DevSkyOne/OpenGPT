@@ -22,7 +22,7 @@
 <h3 align="center">OpenGPT</h3>
 
   <a href="https://github.com/CoasterFreakDE/OpenGPT">
-    <img src="images/opengpt.png" alt="Logo" width="80" height="80">
+    <img src="images/opengpt-nobg.png" alt="Logo" width="80" height="80">
   </a>
 
   <p align="center">
