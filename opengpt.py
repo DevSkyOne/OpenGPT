@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import os
 import sqlite3
+from pathlib import Path
 
 import discord
 import dotenv
@@ -13,11 +14,19 @@ dotenv.load_dotenv()
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix=commands.when_mentioned_or("!"), intents=intents)
+bot = commands.Bot(
+    command_prefix=commands.when_mentioned_or("!"),
+    strip_after_prefix=True,
+    intents=intents,
+    sync_commands=True,
+    delete_not_existing_commands=True,
+    activity=discord.Activity(name='Ask me anything', type=discord.ActivityType.listening),
+    auto_check_for_updates=True
+)
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Connect to the database (creates a new file if it doesn't exist)
-connection = sqlite3.connect("users.db")
+connection = sqlite3.connect("./users.db")
 
 # Create a cursor object to execute SQL commands
 cursor = connection.cursor()
@@ -42,6 +51,7 @@ model_pricing = {
     },
 }
 
+
 def calculate_credit_price(model, prompt_tokens, response_tokens):
     prompt_price = round((prompt_tokens * model_pricing[model]["prompt"]))
     response_price = round((response_tokens * model_pricing[model]["response"]))
@@ -52,7 +62,7 @@ def calculate_credits_to_response_tokens(model, credits):
     return round(credits / model_pricing[model]["response"])
 
 
-async def get_user_credits(user_id):
+async def get_user_credits(user_id) -> (int, datetime.datetime):
     cursor.execute("SELECT credits, last_used FROM users WHERE clientid = ?", (user_id,))
     user_credits = cursor.fetchone()
     if user_credits:
@@ -62,15 +72,16 @@ async def get_user_credits(user_id):
             if last_used < datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1):
                 cursor.execute("UPDATE users SET credits = 100 WHERE clientid = ?", (user_id,))
                 connection.commit()
-                return 100
+                return 100, last_used
             else:
-                return user_credits[0]
+                return user_credits[0], last_used
     else:
         cursor.execute("INSERT INTO users (clientid) VALUES (?)", (user_id,))
-        return 100
+        return 100, datetime.datetime.now(datetime.timezone.utc)
 
 
-async def generate_text(context=None, thinking_message: discord.Message = None, user_id=-1, max_credits=100) -> (str, int):
+async def generate_text(context=None, thinking_message: discord.Message = None, user_id=-1, max_credits=100) -> (
+str, int):
     model = os.getenv("OPENAI_MODEL")
     conversation = [
         {"role": "system", "content": f"You are my personal assistant, especially for code reviews or other "
@@ -160,7 +171,7 @@ async def send_response(message, response):
                 reopened_chunk = responses_chunks[i + 1][:closing_index + 1].strip()
                 responses_chunks[i] = f"{responses_chunks[i]}{'' * (3 - closing_index % 3)}"
                 responses_chunks[
-                    i + 1] = f"{'````'[closing_index % 3:]}{reopened_chunk}{responses_chunks[i + 1][closing_index + 1:].strip()}"
+                    i + 1] = f"{'```'[closing_index % 3:]}{reopened_chunk}{responses_chunks[i + 1][closing_index + 1:].strip()}"
 
             # Check for split words
             if not (responses_chunks[i][-1].isspace() or responses_chunks[i + 1][0].isspace()):
@@ -222,7 +233,7 @@ async def on_message(message):
 
 
 async def generate_answer(context, message, thinking_message):
-    sky_credits = await get_user_credits(message.author.id)
+    sky_credits, _ = await get_user_credits(message.author.id)
     response_text, sky_credits = await generate_text(context=context,
                                                      thinking_message=thinking_message,
                                                      user_id=message.author.id,
@@ -239,11 +250,19 @@ async def on_ready():
     print(f"{bot.user.name} has connected to Discord!")
 
 
-try:
-    bot.run(os.getenv("BOT_TOKEN"))
-except KeyboardInterrupt:
-    print("Shutting down...")
-    connection.commit()
-    connection.close()
-    print("Goodbye!")
-    exit(0)
+if __name__ == '__main__':
+    try:
+        cogs = [p.stem for p in Path('./cogs').glob('**/*.py') if not p.name.startswith('__')]
+        print('Loading \x1b[31m%d\x1b[0m extensions...' % len(cogs))
+
+        for cog in cogs:
+            bot.load_extension(f'cogs.{cog}')
+            print('Loaded \x1b[31m%s\x1b[0m' % cog)
+
+        bot.run(os.getenv("BOT_TOKEN"))
+    except KeyboardInterrupt:
+        print("Shutting down...")
+        connection.commit()
+        connection.close()
+        print("Goodbye!")
+        exit(0)
