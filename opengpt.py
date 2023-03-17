@@ -142,22 +142,7 @@ str, int):
                             thinking_message_content += f"\n\n{full_response[:1600]}...\n\n" \
                                                         f"*...truncated* (Please wait for the full response.)"
 
-                        # Filter out mentions
-                        thinking_message_content = thinking_message_content.replace(f"@everyone", "@ everyone")
-                        thinking_message_content = thinking_message_content.replace(f"@here", "@ here")
-                        ping_regex = re.compile(r"<@!?[0-9]+>")
-
-                        # Find all user mentions and replace them with obfuscated text
-                        def replace_mention(match):
-                            mention = match.group(0)
-                            if mention.startswith("<"):
-                                return "**@**user"
-                            else:
-                                return mention
-
-                        thinking_message_content = ping_regex.sub(replace_mention, thinking_message_content)
-
-                        await thinking_message.edit(content=thinking_message_content)
+                        await thinking_message.edit(content=thinking_message_content, allowed_mentions=discord.AllowedMentions.none())
 
     response_tokens = enc.encode(full_response)
     sky_credits = 0
@@ -179,22 +164,6 @@ async def delete_thinking_message(wait_message):
 
 
 async def send_response(message, response):
-
-    # Filter out mentions
-    response = response.replace(f"@everyone", "@ everyone")
-    response = response.replace(f"@here", "@ here")
-    ping_regex = re.compile(r"<@!?[0-9]+>")
-
-    # Find all user mentions and replace them with obfuscated text
-    def replace_mention(match):
-        mention = match.group(0)
-        if mention.startswith("<"):
-            return "**@**user"
-        else:
-            return mention
-
-    response = ping_regex.sub(replace_mention, response)
-
     def adjust_chunks(responses_chunks):
         for i in range(len(responses_chunks) - 1):
             # Check for code blocks
@@ -219,9 +188,9 @@ async def send_response(message, response):
 
         reference = message
         for response in responses:
-            reference = await message.channel.send(response, reference=reference)
+            reference = await message.channel.send(response, reference=reference, allowed_mentions=discord.AllowedMentions.none())
     else:
-        await message.channel.send(response, reference=message)
+        await message.channel.send(response, reference=message, allowed_mentions=discord.AllowedMentions.none())
 
 
 async def get_conversation_history(message, conversation=None):
