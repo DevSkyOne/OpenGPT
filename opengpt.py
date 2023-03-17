@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import os
+import sqlite3
 
 import discord
 import dotenv
@@ -14,6 +15,18 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix=commands.when_mentioned_or("!"), intents=intents)
 openai.api_key = os.getenv("OPENAI_API_KEY")
+
+# Connect to the database (creates a new file if it doesn't exist)
+connection = sqlite3.connect("users.db")
+
+# Create a cursor object to execute SQL commands
+cursor = connection.cursor()
+
+# Create a table if it doesn't exist
+cursor.execute('''CREATE TABLE IF NOT EXISTS users
+                  (clientid VARCHAR(45) PRIMARY KEY, credits INTEGER DEFAULT 100,
+                   last_used DATETIME DEFAULT CURRENT_TIMESTAMP)''')
+connection.commit()
 
 tokenizer_cache = {"gpt-4": tiktoken.encoding_for_model("gpt-4"),
                    "gpt-3.5-turbo": tiktoken.encoding_for_model("gpt-3.5-turbo")}
@@ -29,9 +42,6 @@ model_pricing = {
     },
 }
 
-overall_credits = 500
-
-
 def calculate_credit_price(model, prompt_tokens, response_tokens):
     prompt_price = round((prompt_tokens * model_pricing[model]["prompt"]))
     response_price = round((response_tokens * model_pricing[model]["response"]))
@@ -42,18 +52,36 @@ def calculate_credits_to_response_tokens(model, credits):
     return round(credits / model_pricing[model]["response"])
 
 
-async def generate_text(context=None, thinking_message: discord.Message = None, max_credits=490) -> (str, int):
-    global overall_credits
+async def get_user_credits(user_id):
+    cursor.execute("SELECT credits, last_used FROM users WHERE clientid = ?", (user_id,))
+    user_credits = cursor.fetchone()
+    if user_credits:
+        last_used = user_credits[1]
+        if last_used:
+            last_used = datetime.datetime.strptime(last_used, "%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc)
+            if last_used < datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1):
+                cursor.execute("UPDATE users SET credits = 100 WHERE clientid = ?", (user_id,))
+                connection.commit()
+                return 100
+            else:
+                return user_credits[0]
+    else:
+        cursor.execute("INSERT INTO users (clientid) VALUES (?)", (user_id,))
+        return 100
+
+
+async def generate_text(context=None, thinking_message: discord.Message = None, user_id=-1, max_credits=100) -> (str, int):
     model = os.getenv("OPENAI_MODEL")
-    conversation = [{"role": "system", "content": f"You are my personal assistant, especially for code reviews or other "
-                                                  f"technic stuff, named 'OpenGPT'. For more in depth help and real"
-                                                  f" support, refer me to DevSky Coding Support "
-                                                  f"(https://discord.gg/devsky). I am using the OpenAI model"
-                                                  f" '{model}'. The datetime is "
-                                                  f"{datetime.datetime.now(datetime.timezone.utc)}."
-                                                  f"I can interact with you by mentioning you or replying to your "
-                                                  f"messages. I have {max_credits} credits left. Please use informal"
-                                                  f" language."}]
+    conversation = [
+        {"role": "system", "content": f"You are my personal assistant, especially for code reviews or other "
+                                      f"technic stuff, named 'OpenGPT'. For more in depth help and real"
+                                      f" support, refer me to DevSky Coding Support "
+                                      f"(https://discord.gg/devsky). I am using the OpenAI model"
+                                      f" '{model}'. The datetime is "
+                                      f"{datetime.datetime.now(datetime.timezone.utc)}."
+                                      f"I can interact with you by mentioning you or replying to your "
+                                      f"messages. I have {max_credits} credits left. Please use informal"
+                                      f" language."}]
 
     if context:
         conversation.extend(context)
@@ -109,7 +137,8 @@ async def generate_text(context=None, thinking_message: discord.Message = None, 
     pricing = model_pricing.get(model)
     if pricing:
         sky_credits = calculate_credit_price(model, len(prompt_tokens), len(response_tokens))
-        overall_credits -= sky_credits
+        cursor.execute("UPDATE users SET credits = credits - ? WHERE clientid = ?", (sky_credits, user_id))
+        connection.commit()
 
     return full_response, sky_credits
 
@@ -126,12 +155,12 @@ async def send_response(message, response):
     def adjust_chunks(responses_chunks):
         for i in range(len(responses_chunks) - 1):
             # Check for code blocks
-            if responses_chunks[i].count("***") % 2 != 0:
+            if responses_chunks[i].count("```") % 2 != 0:
                 closing_index = responses_chunks[i].rfind("")
                 reopened_chunk = responses_chunks[i + 1][:closing_index + 1].strip()
                 responses_chunks[i] = f"{responses_chunks[i]}{'' * (3 - closing_index % 3)}"
                 responses_chunks[
-                    i + 1] = f"{'***`'[closing_index % 3:]}{reopened_chunk}{responses_chunks[i + 1][closing_index + 1:].strip()}"
+                    i + 1] = f"{'````'[closing_index % 3:]}{reopened_chunk}{responses_chunks[i + 1][closing_index + 1:].strip()}"
 
             # Check for split words
             if not (responses_chunks[i][-1].isspace() or responses_chunks[i + 1][0].isspace()):
@@ -193,8 +222,11 @@ async def on_message(message):
 
 
 async def generate_answer(context, message, thinking_message):
-    global overall_credits
-    response_text, sky_credits = await generate_text(context=context, thinking_message=thinking_message, max_credits=overall_credits)
+    sky_credits = await get_user_credits(message.author.id)
+    response_text, sky_credits = await generate_text(context=context,
+                                                     thinking_message=thinking_message,
+                                                     user_id=message.author.id,
+                                                     max_credits=sky_credits)
     if not response_text:
         response_text = "I don't know what to say."
     await send_response(message, response_text)
@@ -207,4 +239,11 @@ async def on_ready():
     print(f"{bot.user.name} has connected to Discord!")
 
 
-bot.run(os.getenv("BOT_TOKEN"))
+try:
+    bot.run(os.getenv("BOT_TOKEN"))
+except KeyboardInterrupt:
+    print("Shutting down...")
+    connection.commit()
+    connection.close()
+    print("Goodbye!")
+    exit(0)
