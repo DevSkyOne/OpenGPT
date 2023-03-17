@@ -1,7 +1,6 @@
 import asyncio
 import datetime
 import os
-import re
 import sqlite3
 from pathlib import Path
 
@@ -35,6 +34,7 @@ cursor = connection.cursor()
 # Create a table if it doesn't exist
 cursor.execute('''CREATE TABLE IF NOT EXISTS users
                   (clientid VARCHAR(45) PRIMARY KEY, credits INTEGER DEFAULT 100,
+                   model VARCHAR(45) DEFAULT 'gpt-3.5-turbo',
                    last_used DATETIME DEFAULT CURRENT_TIMESTAMP)''')
 connection.commit()
 
@@ -43,10 +43,12 @@ tokenizer_cache = {"gpt-4": tiktoken.encoding_for_model("gpt-4"),
 
 model_pricing = {
     "gpt-4": {
+        "max_tokens": 8100,
         "prompt": 0.03,
         "response": 0.06,
     },
     "gpt-3.5-turbo": {
+        "max_tokens": 4000,
         "prompt": 0.002,
         "response": 0.002,
     },
@@ -56,34 +58,39 @@ model_pricing = {
 def calculate_credit_price(model, prompt_tokens, response_tokens):
     prompt_price = round((prompt_tokens * model_pricing[model]["prompt"]))
     response_price = round((response_tokens * model_pricing[model]["response"]))
-    return prompt_price + response_price
+    return prompt_price + response_price + 1
 
 
 def calculate_credits_to_response_tokens(model, credits):
     return round(credits / model_pricing[model]["response"])
 
 
-async def get_user_credits(user_id) -> (int, datetime.datetime):
-    cursor.execute("SELECT credits, last_used FROM users WHERE clientid = ?", (user_id,))
+async def set_user_model(user_id, model):
+    cursor.execute("UPDATE users SET model = ? WHERE clientid = ?", (model, user_id))
+    connection.commit()
+
+
+async def get_user_data(user_id) -> (int, str, datetime.datetime):
+    cursor.execute("SELECT credits, model, last_used FROM users WHERE clientid = ?", (user_id,))
     user_credits = cursor.fetchone()
     if user_credits:
-        last_used = user_credits[1]
+        model = user_credits[1]
+        last_used = user_credits[2]
         if last_used:
             last_used = datetime.datetime.strptime(last_used, "%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc)
             if last_used < datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1):
                 cursor.execute("UPDATE users SET credits = 100 WHERE clientid = ?", (user_id,))
                 connection.commit()
-                return 100, last_used
+                return 100, model, last_used
             else:
-                return user_credits[0], last_used
+                return user_credits[0], model, last_used
     else:
         cursor.execute("INSERT INTO users (clientid) VALUES (?)", (user_id,))
-        return 100, datetime.datetime.now(datetime.timezone.utc)
+        return 100, 'gpt-3.5-turbo', datetime.datetime.now(datetime.timezone.utc)
 
 
-async def generate_text(context=None, thinking_message: discord.Message = None, user_id=-1, max_credits=100) -> (
-str, int):
-    model = os.getenv("OPENAI_MODEL")
+async def generate_text(context=None, thinking_message: discord.Message = None, user_id=-1, max_credits=100,
+                        model='gpt-3.5-turbo') -> (str, int):
     conversation = [
         {"role": "system", "content": f"You are my personal assistant, especially for code reviews or other "
                                       f"technic stuff, named 'OpenGPT'. For more in depth help and real"
@@ -114,10 +121,13 @@ str, int):
     available_credits = max_credits - prompt_credits
     max_response_tokens = calculate_credits_to_response_tokens(model, available_credits)
 
+    pricing = model_pricing.get(model)
+    max_tokens = pricing["max_tokens"]
+
     response = openai.ChatCompletion.create(
         model=model,
         messages=conversation,
-        max_tokens=(min(8100 - len(prompt_tokens), max_response_tokens)),
+        max_tokens=(min(max_tokens - len(prompt_tokens), max_response_tokens)),
         temperature=0.9,
         stream=True,
     )
@@ -130,7 +140,7 @@ str, int):
             if chunk_message.get('content'):
                 received_message = chunk_message['content']
                 full_response += received_message
-                if len(full_response) / 100 > sent_parts:
+                if len(full_response) / 250 > sent_parts:
                     sent_parts += 1
                     if thinking_message:
                         thinking_message_content = f"Generating response... (this may take a while)" \
@@ -145,12 +155,9 @@ str, int):
                         await thinking_message.edit(content=thinking_message_content, allowed_mentions=discord.AllowedMentions.none())
 
     response_tokens = enc.encode(full_response)
-    sky_credits = 0
-    pricing = model_pricing.get(model)
-    if pricing:
-        sky_credits = calculate_credit_price(model, len(prompt_tokens), len(response_tokens))
-        cursor.execute("UPDATE users SET credits = credits - ? WHERE clientid = ?", (sky_credits, user_id))
-        connection.commit()
+    sky_credits = calculate_credit_price(model, len(prompt_tokens), len(response_tokens))
+    cursor.execute("UPDATE users SET credits = credits - ? WHERE clientid = ?", (sky_credits, user_id))
+    connection.commit()
 
     return full_response, sky_credits
 
@@ -215,7 +222,7 @@ async def on_message(message):
         await bot.process_commands(message)
         return
 
-    direct_mentioned = "<@646411900267135004>" in message.content  # Make sure you add ! for direct mentions
+    direct_mentioned = f"<@{bot.user.id}>" in message.content  # Make sure you add ! for direct mentions
     referenced_message_by_bot = (message.reference and message.reference.resolved.author == bot.user)
 
     if not direct_mentioned and not referenced_message_by_bot:
@@ -234,11 +241,12 @@ async def on_message(message):
 
 
 async def generate_answer(context, message, thinking_message):
-    sky_credits, _ = await get_user_credits(message.author.id)
+    sky_credits, model, _ = await get_user_data(message.author.id)
     response_text, sky_credits = await generate_text(context=context,
                                                      thinking_message=thinking_message,
                                                      user_id=message.author.id,
-                                                     max_credits=sky_credits)
+                                                     max_credits=sky_credits,
+                                                     model=model)
     if not response_text:
         response_text = "I don't know what to say."
     await send_response(message, response_text)
