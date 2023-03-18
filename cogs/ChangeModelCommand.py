@@ -1,5 +1,3 @@
-import datetime
-
 from discord import ApplicationCommandInteraction, SlashCommandOption, SlashCommandOptionChoice
 from discord.ext import commands
 
@@ -35,7 +33,6 @@ class CreditCommand(commands.Cog):
 
     )
     async def changemodel(self, ctx: ApplicationCommandInteraction, model: str):
-        await get_user_data(str(ctx.author.id))
         await set_user_model(str(ctx.author.id), model)
         await ctx.respond(f"Your model has been changed to `{model}`", hidden=True)
 
