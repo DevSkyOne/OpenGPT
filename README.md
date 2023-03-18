@@ -39,7 +39,7 @@
 
 ## About The Project
 
-OpenGPT Discord Bot is an interactive Discord bot built to communicate with OpenAI's ChatGPT-4 API. This project aims to bring the power and convenience of ChatGPT-4 to Discord servers, allowing users to engage in conversations, ask questions, or seek information from a highly advanced AI language model.
+OpenGPT Discord Bot is an interactive Discord bot built to communicate with OpenAI's GPT-3.5-Turbo and GPT-4 API. This project aims to bring the power and convenience of ChatGPT to Discord servers, allowing users to engage in conversations, ask questions, or seek information from a highly advanced AI language model.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
