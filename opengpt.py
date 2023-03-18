@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 import aiofiles
+import aiohttp
 import aiomysql
 import discord
 import dotenv
@@ -255,33 +256,28 @@ async def delete_thinking_message(wait_message):
     await wait_message.delete()
 
 
+async def new_bulk_text(text: str):
+    async with aiohttp.ClientSession() as session:
+        async with session.get('https://rentry.co') as r:
+            csfrtoken = r.cookies["csrftoken"].value
+        payload = aiohttp.FormData()
+        payload.add_field("csrfmiddlewaretoken", csfrtoken)
+        payload.add_field("text", text)
+        async with session.post('https://rentry.co/api/new', data=payload, headers={
+            "Cookie": f"csrftoken={csfrtoken}",
+            "Referer": "https://rentry.co",
+        }) as r:
+            return (await r.json(content_type="text/plain"))["url"]
+
 async def send_response(message, response):
-    def adjust_chunks(responses_chunks):
-        for i in range(len(responses_chunks) - 1):
-            # Check for code blocks
-            if responses_chunks[i].count("```") % 2 != 0:
-                closing_index = responses_chunks[i].rfind("")
-                reopened_chunk = responses_chunks[i + 1][:closing_index + 1].strip()
-                responses_chunks[i] = f"{responses_chunks[i]}{'' * (3 - closing_index % 3)}"
-                responses_chunks[
-                    i + 1] = f"{'```'[closing_index % 3:]}{reopened_chunk}{responses_chunks[i + 1][closing_index + 1:].strip()}"
-
-            # Check for split words
-            if not (responses_chunks[i][-1].isspace() or responses_chunks[i + 1][0].isspace()):
-                split_index = responses_chunks[i].rfind(" ")
-                if split_index != -1:
-                    responses_chunks[i + 1] = responses_chunks[i][split_index + 1:] + responses_chunks[i + 1]
-                    responses_chunks[i] = responses_chunks[i][:split_index + 1]
-
     if len(response) > 1850:
-        responses = [response[i:i + 1850] for i in range(0, len(response), 1850)]
-
-        adjust_chunks(responses)
-
-        reference = message
-        for response in responses:
-            reference = await message.channel.send(response, reference=reference,
-                                                   allowed_mentions=discord.AllowedMentions.none())
+        try:
+            url = await new_bulk_text(response)
+            response = f"I'm ready! But the message is too long for Discord.\nI uploaded it here for you: {url}"
+        except Exception as e:
+            print("Error uploading large message:", e)
+            response = "I'm sorry, but I'm currently experiencing technical difficulties. Please try again later."
+        await message.channel.send(response, reference=message, allowed_mentions=discord.AllowedMentions.none())
     else:
         await message.channel.send(response, reference=message, allowed_mentions=discord.AllowedMentions.none())
 
