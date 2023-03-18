@@ -13,6 +13,7 @@ import openai
 import tiktoken
 from aiomysql import Pool
 from discord.ext import commands
+from openai.error import RateLimitError
 
 from database.connection import get_pool
 from database.models import UserData
@@ -21,8 +22,10 @@ log = logging.getLogger('BOT-MAIN')
 
 dotenv.load_dotenv()
 
-intents = discord.Intents.default()
+intents: discord.Intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
+intents.presences = True
 bot = commands.Bot(
     command_prefix=commands.when_mentioned_or("!"),
     strip_after_prefix=True,
@@ -39,12 +42,12 @@ tokenizer_cache = {"gpt-4": tiktoken.encoding_for_model("gpt-4"),
 
 model_pricing = {
     "gpt-4": {
-        "max_tokens": 8100,
+        "max_tokens": 7500,
         "prompt": 0.03,
         "response": 0.06,
     },
     "gpt-3.5-turbo": {
-        "max_tokens": 4000,
+        "max_tokens": 3500,
         "prompt": 0.002,
         "response": 0.002,
     },
@@ -71,12 +74,47 @@ async def get_user_data(user_id) -> UserData:
     return await UserData(user_id).load()
 
 
+async def get_user_information(user_id) -> str:
+    user = await get_user_data(user_id)
+    dc_user = bot.get_user(user_id)
+    return f"User: {dc_user} ({user})"
+
+
+async def get_guild_information(guild_id) -> str:
+    guild = bot.get_guild(guild_id)
+    guild_infos = f"""
+Guild: {guild.name} ({guild.id})
+Owner: {guild.owner} ({guild.owner_id})
+Members: {guild.member_count}
+Created: {guild.created_at}
+Boosts: {guild.premium_subscription_count}
+Boost Level: {guild.premium_tier}
+Description: {guild.description}
+Banner: {guild.banner_url}
+Icon: {guild.icon_url}
+Splash: {guild.splash_url}
+    """
+    return guild_infos
+
+
 async def generate_text(context=None, thinking_message: discord.Message = None, user: UserData = None) -> (str, int):
+    gpt_4_only_user_prompt = """
+    Get more information as the System about the user by using the command `(ui) {user.user_id}` (send it to the user).
+    """
+
+    gpt_4_only_prompt = """
+    You can use the following commands to get more information about a user or this guild (server):
+     - (ui) for userinfo: Displays basic information about a user ex. `(ui) 123456789012345678`
+     - (gi) for guildinfo: Shows information about the current guild (server) ex. `(gi)`
+    You can only use these commands. Please respond with one command at a time without any additional content.
+    """ if user.model == "gpt-4" else ""
+
     conversation = [
         {"role": "system", "content": f"You are a funny Discord bot assistant, named 'OpenGPT'. For human"
                                       f" support, refer to DevSky Coding Support "
                                       f"(https://discord.gg/devsky). The User"
-                                      f" '{user}' started this conversation with you. The current datetime is "
+                                      f" '{user}' (UserID: {user.user_id}) started this conversation with you."
+                                      f"{gpt_4_only_user_prompt} The current datetime is "
                                       f"{datetime.datetime.now(datetime.timezone.utc)}."
                                       f"""Consider the following in your responses:
 - Be conversational
@@ -84,10 +122,19 @@ async def generate_text(context=None, thinking_message: discord.Message = None, 
 - Write spoilers using spoiler tags. For example ||At the end of The Sixth Sense it is revealed that he is dead||.
 - You can mention people by including their user_id in <@user_id>, for example if you wanted to mention yourself
  you should say <@{bot.user.id}>.
+- Your sourcecode is available at https://github.com/CoasterFreakDE/OpenGPT (MIT License)
+- Users can switch between models (gpt-3.5-turbo and gpt-4) using the /changemodel command.
+- Users can check their credits using the /credits command.
 
 Format text using markdown:
 - **bold** to make it clear something is important. For example: **This is important.**
-- [title](url) to add links to text. For example: [Google](https://www.google.com/)
+- *italic* to emphasize something. For example: *This is additional info.*
+
+Information about your environment:
+ - The server you are in is called: {thinking_message.guild.name} (ID: {thinking_message.guild.id})
+ - The channel you are in is called: {thinking_message.channel.name} (ID: {thinking_message.channel.id})
+
+{gpt_4_only_prompt}
 
 Users can interact with you by mentioning you or replying to one of your messages.
 Note that you will respond using informal language (e.g., 'Du'-form in German, never ever use 'Sie').
@@ -115,35 +162,11 @@ Note that you will respond using informal language (e.g., 'Du'-form in German, n
     pricing = model_pricing.get(user.model)
     max_tokens = pricing["max_tokens"]
 
-    response = openai.ChatCompletion.create(
-        model=user.model,
-        messages=conversation,
-        max_tokens=(min(max_tokens - len(prompt_tokens), max_response_tokens)),
-        temperature=0.9,
-        stream=True,
-    )
+    full_response = await generate_openai_response(conversation, max_response_tokens, max_tokens, prompt_tokens,
+                                                   thinking_message, user)
 
-    full_response = ""
-    sent_parts = 1
-    for chunk in response:
-        if chunk['choices']:
-            chunk_message = chunk['choices'][0]['delta']
-            if chunk_message.get('content'):
-                received_message = chunk_message['content']
-                full_response += received_message
-                if len(full_response) / 250 > sent_parts:
-                    sent_parts += 1
-                    if thinking_message:
-                        thinking_message_content = f"Generating response... (this may take a while)" \
-                                                   f" ({sent_parts * 100} characters received)"
-
-                        if len(full_response) < 1600:
-                            thinking_message_content += f"\n\n{full_response}"
-                        else:
-                            thinking_message_content += f"\n\n{full_response[:1600]}...\n\n" \
-                                                        f"*...truncated* (Please wait for the full response.)"
-
-                        await thinking_message.edit(content=thinking_message_content, allowed_mentions=discord.AllowedMentions.none())
+    full_response = await check_for_questions(conversation, full_response, max_response_tokens, max_tokens,
+                                              prompt_tokens, thinking_message, user)
 
     response_tokens = enc.encode(full_response)
     sky_credits = calculate_credit_price(user.model, len(prompt_tokens), len(response_tokens))
@@ -151,6 +174,77 @@ Note that you will respond using informal language (e.g., 'Du'-form in German, n
     await user.save()
 
     return full_response, sky_credits
+
+
+async def check_for_questions(conversation, full_response, max_response_tokens, max_tokens, prompt_tokens,
+                              thinking_message: discord.Message, user):
+    # Check for ask-back commands (bot asks back for more information)
+    if full_response.startswith("(ui)"):  # User information
+        asked_user_id = full_response[5:]
+        asked_user_id = asked_user_id.strip()
+        asked_user_infos = await get_user_information(asked_user_id)
+        conversation.append({"role": "user", "content": asked_user_infos})
+        print("Asking back for user information for user", asked_user_id)
+        await thinking_message.edit(content="Asking back for user information...",
+                                    allowed_mentions=discord.AllowedMentions.none())
+        full_response = await generate_openai_response(conversation, max_response_tokens, max_tokens, prompt_tokens,
+                                                       thinking_message, user)
+        return await check_for_questions(conversation, full_response, max_response_tokens, max_tokens, prompt_tokens,
+                                         thinking_message, user)
+    if full_response.startswith("(gi)"):  # Guild information
+        guild_response = await get_guild_information(thinking_message.guild.id)
+        conversation.append({"role": "user", "content": f"We are currently in {guild_response}"})
+        print("Asking back for guild information")
+        await thinking_message.edit(content="Asking back for guild information...",
+                                    allowed_mentions=discord.AllowedMentions.none())
+        full_response = await generate_openai_response(conversation, max_response_tokens, max_tokens, prompt_tokens,
+                                                       thinking_message, user)
+        return await check_for_questions(conversation, full_response, max_response_tokens, max_tokens, prompt_tokens,
+                                         thinking_message, user)
+
+    return full_response
+
+
+async def generate_openai_response(conversation, max_response_tokens, max_tokens, prompt_tokens, thinking_message,
+                                   user):
+    try:
+        response = openai.ChatCompletion.create(
+            model=user.model,
+            messages=conversation,
+            max_tokens=(min(max_tokens - len(prompt_tokens), max_response_tokens)),
+            temperature=0.9,
+            stream=True,
+        )
+        full_response = ""
+        sent_parts = 1
+        for chunk in response:
+            if chunk['choices']:
+                chunk_message = chunk['choices'][0]['delta']
+                if chunk_message.get('content'):
+                    received_message = chunk_message['content']
+                    full_response += received_message
+                    if len(full_response) / 250 > sent_parts:
+                        sent_parts += 1
+                        if thinking_message:
+                            thinking_message_content = f"Generating response... (this may take a while)" \
+                                                       f" ({sent_parts * 100} characters received)"
+
+                            if len(full_response) < 1600:
+                                thinking_message_content += f"\n\n{full_response}"
+                            else:
+                                thinking_message_content += f"\n\n{full_response[:1600]}...\n\n" \
+                                                            f"*...truncated* (Please wait for the full response.)"
+
+                            await thinking_message.edit(content=thinking_message_content,
+                                                        allowed_mentions=discord.AllowedMentions.none())
+    except RateLimitError as e:
+        print("Rate limit error:", e)
+        full_response = "I'm sorry, but I'm currently rate limited (maybe consider using another model?)." \
+                        " Please try again later."
+    except Exception as e:
+        print("Error:", e)
+        full_response = "I'm sorry, but I'm currently experiencing technical difficulties. Please try again later."
+    return full_response
 
 
 async def send_thinking_message(message):
@@ -186,7 +280,8 @@ async def send_response(message, response):
 
         reference = message
         for response in responses:
-            reference = await message.channel.send(response, reference=reference, allowed_mentions=discord.AllowedMentions.none())
+            reference = await message.channel.send(response, reference=reference,
+                                                   allowed_mentions=discord.AllowedMentions.none())
     else:
         await message.channel.send(response, reference=message, allowed_mentions=discord.AllowedMentions.none())
 

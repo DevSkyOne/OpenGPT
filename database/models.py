@@ -15,7 +15,7 @@ class UserData:
         self.plans = []
 
     def __repr__(self):
-        return f"UserData(user_id={self.user_id}, credits={self.credits}, model={self.model}," \
+        return f"UserData(discord_user_id={self.user_id}, credits_left_today={self.credits}, model={self.model}," \
                f" credits_refilled={self.last_used}, created={self.created}, plans={self.plans})"
 
     async def load(self):
@@ -30,7 +30,7 @@ class UserData:
                                       self.user_id)
                     await conn.commit()
                     print("Created new user entry for user with id", self.user_id)
-                    return
+                    return self
                 self.credits = data[1]
                 self.model = data[2]
                 self.last_used = data[3]
