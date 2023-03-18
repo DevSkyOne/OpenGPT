@@ -272,7 +272,7 @@ async def new_bulk_text(text: str):
 async def send_response(message, response):
     if len(response) > 1850:
         try:
-            url = new_bulk_text(response)
+            url = await new_bulk_text(response)
             response = f"I'm ready! But the message is too long for Discord.\nI uploaded it here for you: {url}"
         except Exception as e:
             print("Error uploading large message:", e)
