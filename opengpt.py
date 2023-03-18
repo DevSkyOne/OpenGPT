@@ -1,14 +1,23 @@
 import asyncio
 import datetime
+import logging
 import os
-import sqlite3
+import re
 from pathlib import Path
 
+import aiofiles
+import aiomysql
 import discord
 import dotenv
 import openai
 import tiktoken
+from aiomysql import Pool
 from discord.ext import commands
+
+from database.connection import get_pool
+from database.models import UserData
+
+log = logging.getLogger('BOT-MAIN')
 
 dotenv.load_dotenv()
 
@@ -24,19 +33,6 @@ bot = commands.Bot(
     auto_check_for_updates=True
 )
 openai.api_key = os.getenv("OPENAI_API_KEY")
-
-# Connect to the database (creates a new file if it doesn't exist)
-connection = sqlite3.connect("./users.db")
-
-# Create a cursor object to execute SQL commands
-cursor = connection.cursor()
-
-# Create a table if it doesn't exist
-cursor.execute('''CREATE TABLE IF NOT EXISTS users
-                  (clientid VARCHAR(45) PRIMARY KEY, credits INTEGER DEFAULT 100,
-                   model VARCHAR(45) DEFAULT 'gpt-3.5-turbo',
-                   last_used DATETIME DEFAULT CURRENT_TIMESTAMP)''')
-connection.commit()
 
 tokenizer_cache = {"gpt-4": tiktoken.encoding_for_model("gpt-4"),
                    "gpt-3.5-turbo": tiktoken.encoding_for_model("gpt-3.5-turbo")}
@@ -66,66 +62,61 @@ def calculate_credits_to_response_tokens(model, credits):
 
 
 async def set_user_model(user_id, model):
-    cursor.execute("UPDATE users SET model = ? WHERE clientid = ?", (model, user_id))
-    connection.commit()
+    user = await UserData(user_id).load()
+    user.model = model
+    await user.save()
 
 
-async def get_user_data(user_id) -> (int, str, datetime.datetime):
-    cursor.execute("SELECT credits, model, last_used FROM users WHERE clientid = ?", (user_id,))
-    user_credits = cursor.fetchone()
-    if user_credits:
-        model = user_credits[1]
-        last_used = user_credits[2]
-        if last_used:
-            last_used = datetime.datetime.strptime(last_used, "%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc)
-            if last_used < datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1):
-                cursor.execute("UPDATE users SET credits = 100 WHERE clientid = ?", (user_id,))
-                connection.commit()
-                return 100, model, last_used
-            else:
-                return user_credits[0], model, last_used
-    else:
-        cursor.execute("INSERT INTO users (clientid) VALUES (?)", (user_id,))
-        return 100, 'gpt-3.5-turbo', datetime.datetime.now(datetime.timezone.utc)
+async def get_user_data(user_id) -> UserData:
+    return await UserData(user_id).load()
 
 
-async def generate_text(context=None, thinking_message: discord.Message = None, user_id=-1, max_credits=100,
-                        model='gpt-3.5-turbo') -> (str, int):
+async def generate_text(context=None, thinking_message: discord.Message = None, user: UserData = None) -> (str, int):
     conversation = [
-        {"role": "system", "content": f"You are my personal assistant, especially for code reviews or other "
-                                      f"technic stuff, named 'OpenGPT'. For more in depth help and real"
-                                      f" support, refer me to DevSky Coding Support "
-                                      f"(https://discord.gg/devsky). I am using the OpenAI model"
-                                      f" '{model}'. The datetime is "
+        {"role": "system", "content": f"You are a funny Discord bot assistant, named 'OpenGPT'. For human"
+                                      f" support, refer to DevSky Coding Support "
+                                      f"(https://discord.gg/devsky). The User"
+                                      f" '{user}' started this conversation with you. The current datetime is "
                                       f"{datetime.datetime.now(datetime.timezone.utc)}."
-                                      f"I can interact with you by mentioning you or replying to your "
-                                      f"messages. I have {max_credits} credits left. Please use informal"
-                                      f" language."}]
+                                      f"""Consider the following in your responses:
+- Be conversational
+- Add unicode emoji to be more playful in your responses
+- Write spoilers using spoiler tags. For example ||At the end of The Sixth Sense it is revealed that he is dead||.
+- You can mention people by including their user_id in <@user_id>, for example if you wanted to mention yourself
+ you should say <@{bot.user.id}>.
+
+Format text using markdown:
+- **bold** to make it clear something is important. For example: **This is important.**
+- [title](url) to add links to text. For example: [Google](https://www.google.com/)
+
+Users can interact with you by mentioning you or replying to one of your messages.
+Note that you will respond using informal language (e.g., 'Du'-form in German, never ever use 'Sie').
+"""}]
 
     if context:
         conversation.extend(context)
 
-    if tokenizer_cache.get(model):
-        enc = tokenizer_cache[model]
+    if tokenizer_cache.get(user.model):
+        enc = tokenizer_cache[user.model]
     else:
-        enc = tiktoken.encoding_for_model(model)
-        tokenizer_cache[model] = enc
+        enc = tiktoken.encoding_for_model(user.model)
+        tokenizer_cache[user.model] = enc
 
     conversation_content = "\n".join([f"{message['content']}" for message in conversation])
     prompt_tokens = enc.encode(conversation_content)
 
-    prompt_credits = calculate_credit_price(model, len(prompt_tokens), 0)
-    if prompt_credits > max_credits:
+    prompt_credits = calculate_credit_price(user.model, len(prompt_tokens), 0)
+    if prompt_credits > user.credits:
         return "I'm sorry, but you don't have enough credits to answer this question.", 0
 
-    available_credits = max_credits - prompt_credits
-    max_response_tokens = calculate_credits_to_response_tokens(model, available_credits)
+    available_credits = user.credits - prompt_credits
+    max_response_tokens = calculate_credits_to_response_tokens(user.model, available_credits)
 
-    pricing = model_pricing.get(model)
+    pricing = model_pricing.get(user.model)
     max_tokens = pricing["max_tokens"]
 
     response = openai.ChatCompletion.create(
-        model=model,
+        model=user.model,
         messages=conversation,
         max_tokens=(min(max_tokens - len(prompt_tokens), max_response_tokens)),
         temperature=0.9,
@@ -155,9 +146,9 @@ async def generate_text(context=None, thinking_message: discord.Message = None, 
                         await thinking_message.edit(content=thinking_message_content, allowed_mentions=discord.AllowedMentions.none())
 
     response_tokens = enc.encode(full_response)
-    sky_credits = calculate_credit_price(model, len(prompt_tokens), len(response_tokens))
-    cursor.execute("UPDATE users SET credits = credits - ? WHERE clientid = ?", (sky_credits, user_id))
-    connection.commit()
+    sky_credits = calculate_credit_price(user.model, len(prompt_tokens), len(response_tokens))
+    user.credits -= sky_credits
+    await user.save()
 
     return full_response, sky_credits
 
@@ -241,14 +232,16 @@ async def on_message(message):
 
 
 async def generate_answer(context, message, thinking_message):
-    sky_credits, model, _ = await get_user_data(message.author.id)
+    user = await get_user_data(message.author.id)
     response_text, sky_credits = await generate_text(context=context,
                                                      thinking_message=thinking_message,
-                                                     user_id=message.author.id,
-                                                     max_credits=sky_credits,
-                                                     model=model)
+                                                     user=user)
     if not response_text:
         response_text = "I don't know what to say."
+
+    # Replace @gif(search term) with a random gif from giphy with the search term
+    response_text = re.sub(r"@gif\((.+?)\)", lambda m: f"{m.group(1)}", response_text)
+
     await send_response(message, response_text)
     await delete_thinking_message(thinking_message)
 
@@ -258,19 +251,37 @@ async def on_ready():
     print(f"{bot.user.name} has connected to Discord!")
 
 
+async def init_db() -> None:
+    pool: Pool = await get_pool()
+    async with aiofiles.open("database/db_structure.sql", "r") as fp:
+        struct = await fp.read()
+
+    async with pool.acquire() as connection:
+        connection: aiomysql.Connection
+        cursor: aiomysql.Cursor = await connection.cursor()
+        for query in struct.split(";"):
+            try:
+                await cursor.execute(query)
+            except Exception as e:
+                log.error(e)
+                continue
+    pool.close()
+    await pool.wait_closed()
+
+
 if __name__ == '__main__':
     try:
+        log.info("Starting bot...")
+        bot.loop.run_until_complete(init_db())
         cogs = [p.stem for p in Path('./cogs').glob('**/*.py') if not p.name.startswith('__')]
-        print('Loading \x1b[31m%d\x1b[0m extensions...' % len(cogs))
+        log.info('Loading \x1b[31m%d\x1b[0m extensions...' % len(cogs))
 
         for cog in cogs:
             bot.load_extension(f'cogs.{cog}')
-            print('Loaded \x1b[31m%s\x1b[0m' % cog)
+            log.info('Loaded \x1b[31m%s\x1b[0m' % cog)
 
         bot.run(os.getenv("BOT_TOKEN"))
     except KeyboardInterrupt:
-        print("Shutting down...")
-        connection.commit()
-        connection.close()
-        print("Goodbye!")
+        log.info("Shutting down...")
+        log.info("Goodbye!")
         exit(0)

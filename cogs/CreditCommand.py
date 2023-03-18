@@ -14,14 +14,14 @@ class CreditCommand(commands.Cog):
     @commands.Cog.slash_command(name="credits", description="Check your credits")
     async def credits(self, ctx: ApplicationCommandInteraction):
         user_id = str(ctx.author.id)
-        sky_credits, model, last_used = await get_user_data(user_id)
-        print(sky_credits, last_used)
+        user = await get_user_data(user_id)
+        print(user)
 
-        renew_at = last_used + datetime.timedelta(days=1)
+        renew_at = user.last_used + datetime.timedelta(days=1)
 
-        await ctx.respond(f"You have {sky_credits} credits left.\n"
+        await ctx.respond(f"You have {user.credits} credits left for today.\n"
                           f"They renew at <t:{round(renew_at.timestamp())}:R>\n\n"
-                          f"Your current model is `{model}`", hidden=True)
+                          f"Your current model is `{user.model}`", hidden=True)
 
 
 def setup(bot):
