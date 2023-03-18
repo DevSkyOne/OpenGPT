@@ -46,7 +46,7 @@ OpenGPT Discord Bot is an interactive Discord bot built to communicate with Open
 
 ### Features
 
-Interact with ChatGPT-4 by simply mentioning the bot using @OpenGPT or replying to a recent message from the bot.
+Interact with ChatGPT by simply mentioning the bot using @OpenGPT or replying to a recent message from the bot.
 Accessible and user-friendly, with a daily limit of 100 Credits (equivalent to ~10 cents) per user to manage API costs.
 
 Invite the official bot to your server with ease using this link: [Official discord bot invite](https://discord.com/api/oauth2/authorize?client_id=646411900267135004&permissions=274877975552&scope=bot%20applications.commands)
