@@ -173,7 +173,7 @@ Project Link: [https://github.com/DevSkyOne/OpenGPT](https://github.com/DevSkyOn
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 
 [contributors-shield]: https://img.shields.io/github/contributors/DevSkyOne/OpenGPT.svg?style=for-the-badge
-[contributors-url]: https://github.com/orgs/DevSkyOne/OpenGPT/graphs/contributors
+[contributors-url]: https://github.com/DevSkyOne/OpenGPT/graphs/contributors
 [forks-shield]: https://img.shields.io/github/forks/DevSkyOne/OpenGPT.svg?style=for-the-badge
 [forks-url]: https://github.com/DevSkyOne/OpenGPT/network/members
 [stars-shield]: https://img.shields.io/github/stars/DevSkyOne/OpenGPT.svg?style=for-the-badge
@@ -181,7 +181,7 @@ Project Link: [https://github.com/DevSkyOne/OpenGPT](https://github.com/DevSkyOn
 [issues-shield]: https://img.shields.io/github/issues/CoasterFDevSkyOnereakDE/OpenGPT.svg?style=for-the-badge
 [issues-url]: https://github.com/DevSkyOne/OpenGPT/issues
 [license-shield]: https://img.shields.io/github/license/DevSkyOne/OpenGPT.svg?style=for-the-badge
-[license-url]: https://github.com/orgs/DevSkyOne/OpenGPT/main/LICENSE
+[license-url]: https://github.com/DevSkyOne/OpenGPT/blob/main/LICENSE
 [Python]: https://img.shields.io/badge/Language-Python-green
 [Python-url]: https://www.python.org/
 [discord4py]: https://img.shields.io/badge/Framework-discord4py-blue
