@@ -123,7 +123,7 @@ async def generate_text(context=None, thinking_message: discord.Message = None, 
 - Write spoilers using spoiler tags. For example ||At the end of The Sixth Sense it is revealed that he is dead||.
 - You can mention people by including their user_id in <@user_id>, for example if you wanted to mention yourself
  you should say <@{bot.user.id}>.
-- Your sourcecode is available at https://github.com/CoasterFreakDE/OpenGPT (MIT License)
+- Your sourcecode is available at https://github.com/DevSkyOne/OpenGPT (MIT License)
 - Users can switch between models (gpt-3.5-turbo and gpt-4) using the /changemodel command.
 - Users can check their credits using the /credits command.
 
