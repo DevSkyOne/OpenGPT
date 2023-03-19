@@ -21,7 +21,7 @@
 <div align="center">
 <h3 align="center">OpenGPT</h3>
 
-  <a href="https://github.com/CoasterFreakDE/OpenGPT">
+  <a href="https://github.com/DevSkyOne/OpenGPT">
     <img src="images/opengpt-nobg.png" alt="Logo" width="80" height="80">
   </a>
 
@@ -29,9 +29,9 @@
     Open Source ChatGPT-4 discord bot
     <br />
     <br />
-    <a href="https://github.com/CoasterFreakDE/OpenGPT/issues">Report Bug</a>
+    <a href="https://github.com/DevSkyOne/OpenGPT/issues">Report Bug</a>
     ·
-    <a href="https://github.com/CoasterFreakDE/OpenGPT/issues">Request Feature</a>
+    <a href="https://github.com/DevSkyOne/OpenGPT/issues">Request Feature</a>
   </p>
 </div>
 
@@ -91,7 +91,7 @@ You need the following software to run this plugin:
 - [ ] File Support
 - [ ] Image Support (GPT-4 api added image support)
 
-See the [open issues](https://github.com/CoasterFreakDE/OpenGPT/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) for a full
+See the [open issues](https://github.com/DevSkyOne/OpenGPT/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) for a full
 list of proposed features (and known issues).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -152,7 +152,7 @@ Please don't hesitate to open issues or submit pull requests for any improvement
 
 ## Contact
 
-Project Link: [https://github.com/CoasterFreakDE/OpenGPT](https://github.com/CoasterFreakDE/OpenGPT)
+Project Link: [https://github.com/DevSkyOne/OpenGPT](https://github.com/DevSkyOne/OpenGPT)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -172,16 +172,16 @@ Project Link: [https://github.com/CoasterFreakDE/OpenGPT](https://github.com/Coa
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 
-[contributors-shield]: https://img.shields.io/github/contributors/CoasterFreakDE/OpenGPT.svg?style=for-the-badge
-[contributors-url]: https://github.com/orgs/CoasterFreakDE/OpenGPT/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/CoasterFreakDE/OpenGPT.svg?style=for-the-badge
-[forks-url]: https://github.com/CoasterFreakDE/OpenGPT/network/members
-[stars-shield]: https://img.shields.io/github/stars/CoasterFreakDE/OpenGPT.svg?style=for-the-badge
-[stars-url]: https://github.com/CoasterFreakDE/OpenGPT/stargazers
-[issues-shield]: https://img.shields.io/github/issues/CoasterFreakDE/OpenGPT.svg?style=for-the-badge
-[issues-url]: https://github.com/CoasterFreakDE/OpenGPT/issues
-[license-shield]: https://img.shields.io/github/license/CoasterFreakDE/OpenGPT.svg?style=for-the-badge
-[license-url]: https://github.com/orgs/CoasterFreakDE/OpenGPT/main/LICENSE
+[contributors-shield]: https://img.shields.io/github/contributors/DevSkyOne/OpenGPT.svg?style=for-the-badge
+[contributors-url]: https://github.com/orgs/DevSkyOne/OpenGPT/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/DevSkyOne/OpenGPT.svg?style=for-the-badge
+[forks-url]: https://github.com/DevSkyOne/OpenGPT/network/members
+[stars-shield]: https://img.shields.io/github/stars/DevSkyOne/OpenGPT.svg?style=for-the-badge
+[stars-url]: https://github.com/DevSkyOne/OpenGPT/stargazers
+[issues-shield]: https://img.shields.io/github/issues/CoasterFDevSkyOnereakDE/OpenGPT.svg?style=for-the-badge
+[issues-url]: https://github.com/DevSkyOne/OpenGPT/issues
+[license-shield]: https://img.shields.io/github/license/DevSkyOne/OpenGPT.svg?style=for-the-badge
+[license-url]: https://github.com/orgs/DevSkyOne/OpenGPT/main/LICENSE
 [Python]: https://img.shields.io/badge/Language-Python-green
 [Python-url]: https://www.python.org/
 [discord4py]: https://img.shields.io/badge/Framework-discord4py-blue
