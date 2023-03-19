@@ -153,3 +153,4 @@ cython_debug/
 
 users.db
 .DS_Store
+.idea/
