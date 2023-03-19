@@ -35,6 +35,10 @@
   </p>
 </div>
 
+[![Maintainability][sonar-maintainability]][sonar-project-url]
+[![Reliability][sonar-reliability]][sonar-project-url]
+[![Security][sonar-security]][sonar-project-url]
+
 <!-- ABOUT THE PROJECT -->
 
 ## About The Project
@@ -178,10 +182,14 @@ Project Link: [https://github.com/DevSkyOne/OpenGPT](https://github.com/DevSkyOn
 [forks-url]: https://github.com/DevSkyOne/OpenGPT/network/members
 [stars-shield]: https://img.shields.io/github/stars/DevSkyOne/OpenGPT.svg?style=for-the-badge
 [stars-url]: https://github.com/DevSkyOne/OpenGPT/stargazers
-[issues-shield]: https://img.shields.io/github/issues/CoasterFDevSkyOnereakDE/OpenGPT.svg?style=for-the-badge
+[issues-shield]: https://img.shields.io/github/issues/DevSkyOne/OpenGPT.svg?style=for-the-badge
 [issues-url]: https://github.com/DevSkyOne/OpenGPT/issues
 [license-shield]: https://img.shields.io/github/license/DevSkyOne/OpenGPT.svg?style=for-the-badge
 [license-url]: https://github.com/DevSkyOne/OpenGPT/blob/main/LICENSE
+[sonar-project-url]: https://qube.flawcra.cc/dashboard?id=DevSkyOne_OpenGPT_AYb3NZCEGAY92Yk589XA
+[sonar-maintainability]: https://qube.flawcra.cc/api/project_badges/measure?project=DevSkyOne_OpenGPT_AYb3NZCEGAY92Yk589XA&metric=sqale_rating
+[sonar-reliability]: https://qube.flawcra.cc/api/project_badges/measure?project=DevSkyOne_OpenGPT_AYb3NZCEGAY92Yk589XA&metric=reliability_rating
+[sonar-security]: https://qube.flawcra.cc/api/project_badges/measure?project=DevSkyOne_OpenGPT_AYb3NZCEGAY92Yk589XA&metric=security_rating
 [Python]: https://img.shields.io/badge/Language-Python-green
 [Python-url]: https://www.python.org/
 [discord4py]: https://img.shields.io/badge/Framework-discord4py-blue
