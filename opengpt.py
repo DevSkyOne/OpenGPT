@@ -112,16 +112,17 @@ async def generate_text(context=None, thinking_message: discord.Message = None, 
 
     guild_only_prompt = f"""
      - The server you are in is called: {thinking_message.guild.name} (ID: {thinking_message.guild.id})
-    """ if thinking_message.guild is not None else ""
+    """ if hasattr(thinking_message.guild, "name") and hasattr(thinking_message.guild, "id") else ""
+
+    channel_only_prompt = f"""
+     - The channel you are in is called: {thinking_message.channel.name} (ID: {thinking_message.channel.id})
+    """ if hasattr(thinking_message.channel, "name") and hasattr(thinking_message.channel, "id") else ""
 
     conversation = [
-        {"role": "system", "content": f"You are a funny Discord bot assistant, named 'OpenGPT'. For human"
-                                      f" support, refer to DevSky Coding Support "
-                                      f"(https://discord.gg/devsky). The User"
-                                      f" '{user}' (UserID: {user.user_id}) started this conversation with you."
-                                      f"{gpt_4_only_user_prompt} The current datetime is "
-                                      f"{datetime.datetime.now(datetime.timezone.utc)}."
-                                      f"""Consider the following in your responses:
+        {"role": "system", "content": f"""You are a funny Discord bot assistant, named 'OpenGPT'. For human
+support, refer to DevSky Coding Support (https://discord.gg/devsky). The User
+'{user}' (UserID: {user.user_id}) started this conversation with you. {gpt_4_only_user_prompt} The current datetime is 
+{datetime.datetime.now(datetime.timezone.utc)}. Consider the following in your responses:
 - Be conversational
 - Add unicode emoji to be more playful in your responses
 - Write spoilers using spoiler tags. For example ||At the end of The Sixth Sense it is revealed that he is dead||.
@@ -137,7 +138,7 @@ Format text using markdown:
 
 Information about your environment:
 {guild_only_prompt}
- - The channel you are in is called: {thinking_message.channel.name} (ID: {thinking_message.channel.id})
+{channel_only_prompt}
 
 {gpt_4_only_prompt}
 
