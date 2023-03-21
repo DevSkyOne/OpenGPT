@@ -368,7 +368,7 @@ async def init_db() -> None:
 
 if __name__ == '__main__':
     try:
-        log.info("Starting bot...")
+        log.info("Starting prod bot...")
         bot.loop.run_until_complete(init_db())
         cogs = [p.stem for p in Path('./cogs').glob('**/*.py') if not p.name.startswith('__')]
         log.info('Loading \x1b[31m%d\x1b[0m extensions...' % len(cogs))
