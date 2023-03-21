@@ -190,7 +190,7 @@ async def check_for_questions(conversation, full_response, max_response_tokens, 
         asked_user_id = full_response[5:]
         asked_user_id = asked_user_id.strip()
         asked_user_infos = await get_user_information(asked_user_id)
-        conversation.append({"role": "user", "content": asked_user_infos})
+        conversation.append({"role": "assistant", "content": asked_user_infos})
         print("Asking back for user information for user", asked_user_id)
         await thinking_message.edit(content="Asking back for user information...",
                                     allowed_mentions=discord.AllowedMentions.none())
@@ -200,7 +200,7 @@ async def check_for_questions(conversation, full_response, max_response_tokens, 
                                          thinking_message, user)
     if full_response.startswith("(gi)"):  # Guild information
         guild_response = await get_guild_information(thinking_message.guild.id)
-        conversation.append({"role": "user", "content": f"We are currently in {guild_response}"})
+        conversation.append({"role": "assistant", "content": f"We are currently in {guild_response}"})
         print("Asking back for guild information")
         await thinking_message.edit(content="Asking back for guild information...",
                                     allowed_mentions=discord.AllowedMentions.none())
