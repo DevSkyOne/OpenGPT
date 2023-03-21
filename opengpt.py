@@ -209,6 +209,29 @@ async def check_for_questions(conversation, full_response, max_response_tokens, 
         return await check_for_questions(conversation, full_response, max_response_tokens, max_tokens, prompt_tokens,
                                          thinking_message, user)
 
+    if full_response.startswith("(s)"):  # Web Search
+        query = full_response[4:]
+        query = query.strip()
+        query_results = await web_search(query)
+        # limit to 5 results
+        query_results["results"] = query_results["results"][:5]
+        # if query_results.success is true, results is a list of objects with the following attributes:
+        # title, url, desc
+        if query_results.get("success"):
+            conversation.append({"role": "assistant", "content": f"Here are the results for {query}:"})
+            for result in query_results.get("results"):
+                conversation.append({"role": "assistant", "content": f"{result.get('title')} ({result.get('url')})"})
+                conversation.append({"role": "assistant", "content": f"{result.get('desc')}"})
+        else:
+            conversation.append({"role": "assistant", "content": f"Sorry, I couldn't find anything for {query}."})
+        print("Searching on the internet", query)
+        await thinking_message.edit(content=f"Searching for {query}...",
+                                    allowed_mentions=discord.AllowedMentions.none())
+        full_response = await generate_openai_response(conversation, max_response_tokens, max_tokens, prompt_tokens,
+                                                       thinking_message, user)
+        return await check_for_questions(conversation, full_response, max_response_tokens, max_tokens, prompt_tokens,
+                                         thinking_message, user)
+
     return full_response
 
 
@@ -261,6 +284,10 @@ async def send_thinking_message(message):
 async def delete_thinking_message(wait_message):
     await wait_message.delete()
 
+async def web_search(query: str):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"https://search.flawcra.cc/q/{query}") as r:
+            return await r.json()
 
 async def new_bulk_text(text: str):
     async with aiohttp.ClientSession() as session:
