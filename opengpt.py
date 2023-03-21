@@ -143,8 +143,10 @@ Information about your environment:
 
 {gpt_4_only_prompt}
 
+You MUST NOT use markdown on links. For example, if you want to link to https://devsky.one, you should write
+https://devsky.one instead of [https://devsky.one](https://devsky.one).
 Users can interact with you by mentioning you or replying to one of your messages.
-Note that you will respond using informal language (e.g., 'Du'-form in German, never ever use 'Sie').
+Note that you will respond using informal language (e.g., 'Du'-form in German, NEVER EVER use 'Sie').
 """}]
 
     if context:
