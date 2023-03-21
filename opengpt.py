@@ -110,6 +110,10 @@ async def generate_text(context=None, thinking_message: discord.Message = None, 
     You can only use these commands. Please respond with one command at a time without any additional content.
     """ if user.model == "gpt-4" else ""
 
+    guild_only_prompt = f"""
+     - The server you are in is called: {thinking_message.guild.name} (ID: {thinking_message.guild.id})
+    """ if thinking_message.guild is not None else ""
+
     conversation = [
         {"role": "system", "content": f"You are a funny Discord bot assistant, named 'OpenGPT'. For human"
                                       f" support, refer to DevSky Coding Support "
@@ -132,7 +136,7 @@ Format text using markdown:
 - *italic* to emphasize something. For example: *This is additional info.*
 
 Information about your environment:
- - The server you are in is called: {thinking_message.guild.name} (ID: {thinking_message.guild.id})
+{guild_only_prompt}
  - The channel you are in is called: {thinking_message.channel.name} (ID: {thinking_message.channel.id})
 
 {gpt_4_only_prompt}
@@ -268,6 +272,7 @@ async def new_bulk_text(text: str):
             "Referer": "https://rentry.co",
         }) as r:
             return (await r.json(content_type="text/plain"))["url"]
+
 
 async def send_response(message, response):
     if len(response) > 1850:
