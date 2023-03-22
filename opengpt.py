@@ -107,7 +107,7 @@ Splash: {guild.splash_url}
 
 
 async def generate_text(context=None, thinking_message: discord.Message = None, user: UserData = None) -> (str, int):
-    gpt_4_only_user_prompt = """
+    gpt_4_only_user_prompt = f"""
     Get more information as the System about the user by using the command `(ui) {user.user_id}` (send it to the user).
     """
 
