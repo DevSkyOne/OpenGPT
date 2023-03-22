@@ -273,6 +273,9 @@ async def generate_openai_response(conversation, max_response_tokens, max_tokens
         print("Rate limit error:", e)
         full_response = "I'm sorry, but I'm currently rate limited (maybe consider using another model?)." \
                         " Please try again later."
+        if "The server had an error" in str(e):
+            full_response = "I'm sorry, but I'm currently experiencing technical difficulties. Please try again later."
+
     except Exception as e:
         print("Error:", e)
         full_response = "I'm sorry, but I'm currently experiencing technical difficulties. Please try again later."
