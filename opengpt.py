@@ -4,6 +4,7 @@ import logging
 import os
 import re
 from pathlib import Path
+import sentry_sdk
 
 import aiofiles
 import aiohttp
@@ -22,6 +23,13 @@ from database.models import UserData
 log = logging.getLogger('BOT-MAIN')
 
 dotenv.load_dotenv()
+
+if os.getenv("SENTRY_DSN") != "YOUR_SENTRY_DSN":
+    sentry_sdk.init(
+        dsn=os.getenv("SENTRY_DSN"),
+        environment=os.getenv("SENTRY_ENV"),
+        traces_sample_rate=1.0
+    )
 
 intents: discord.Intents = discord.Intents.default()
 intents.message_content = True
@@ -272,6 +280,7 @@ async def generate_openai_response(conversation, max_response_tokens, max_tokens
                             await thinking_message.edit(content=thinking_message_content,
                                                         allowed_mentions=discord.AllowedMentions.none())
     except RateLimitError as e:
+        sentry_sdk.capture_exception(e)
         print("Rate limit error:", e)
         full_response = "I'm sorry, but I'm currently rate limited (maybe consider using another model?)." \
                         " Please try again later."
@@ -279,6 +288,7 @@ async def generate_openai_response(conversation, max_response_tokens, max_tokens
             full_response = "I'm sorry, but I'm currently experiencing technical difficulties. Please try again later."
 
     except Exception as e:
+        sentry_sdk.capture_exception(e)
         print("Error:", e)
         full_response = "I'm sorry, but I'm currently experiencing technical difficulties. Please try again later."
     return full_response
@@ -318,6 +328,7 @@ async def send_response(message, response):
             url = await new_bulk_text(response)
             response = f"I'm ready! But the message is too long for Discord.\nI uploaded it here for you: {url}"
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             print("Error uploading large message:", e)
             response = "I'm sorry, but I'm currently experiencing technical difficulties. Please try again later."
         await message.channel.send(response, reference=message, allowed_mentions=discord.AllowedMentions.none())
@@ -362,6 +373,7 @@ async def on_message(message):
     try:
         asyncio.create_task(generate_answer(context, message, thinking_message))
     except Exception as e:
+        sentry_sdk.capture_exception(e)
         await thinking_message.edit(content=f"An error occurred: {e}")
 
 
@@ -397,6 +409,7 @@ async def init_db() -> None:
             try:
                 await cursor.execute(query)
             except Exception as e:
+                sentry_sdk.capture_exception(e)
                 log.error(e)
                 continue
     pool.close()
