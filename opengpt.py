@@ -286,10 +286,12 @@ async def send_thinking_message(message):
 async def delete_thinking_message(wait_message):
     await wait_message.delete()
 
+
 async def web_search(query: str):
     async with aiohttp.ClientSession() as session:
-        async with session.get(f"https://search.flawcra.cc/q/{query}") as r:
+        async with session.get(f"https://search.flawcra.cc/safeq/{query}") as r:
             return await r.json()
+
 
 async def new_bulk_text(text: str):
     async with aiohttp.ClientSession() as session:
