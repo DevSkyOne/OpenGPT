@@ -4,6 +4,7 @@ import logging
 import os
 import re
 from pathlib import Path
+import sentry_sdk
 
 import aiofiles
 import aiohttp
@@ -23,11 +24,18 @@ log = logging.getLogger('BOT-MAIN')
 
 dotenv.load_dotenv()
 
+if os.getenv("SENTRY_DSN") != "YOUR_SENTRY_DSN":
+    sentry_sdk.init(
+        dsn=os.getenv("SENTRY_DSN"),
+        environment=os.getenv("SENTRY_ENV"),
+        traces_sample_rate=1.0
+    )
+
 intents: discord.Intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 intents.presences = True
-bot = commands.Bot(
+bot = commands.AutoShardedBot(
     command_prefix=commands.when_mentioned_or("!"),
     strip_after_prefix=True,
     intents=intents,
@@ -99,15 +107,18 @@ Splash: {guild.splash_url}
 
 
 async def generate_text(context=None, thinking_message: discord.Message = None, user: UserData = None) -> (str, int):
-    gpt_4_only_user_prompt = """
+    gpt_4_only_user_prompt = f"""
     Get more information as the System about the user by using the command `(ui) {user.user_id}` (send it to the user).
     """
 
     gpt_4_only_prompt = """
     You can use the following commands to get more information about a user or this guild (server):
-     - (ui) for userinfo: Displays basic information about a user ex. `(ui) 123456789012345678`
-     - (gi) for guildinfo: Shows information about the current guild (server) ex. `(gi)`
+     - (ui) for user info: Displays basic information about a user ex. `(ui) 123456789012345678`
+     - (gi) for guild info: Shows information about the current guild (server) ex. `(gi)`
+     - (s) for anything you don't currently know: Displays search results about the query that was given to the command
+        ex. `(s) <generate a search query about the current question>`
     You can only use these commands. Please respond with one command at a time without any additional content.
+    THIS IS A MUST!
     """ if user.model == "gpt-4" else ""
 
     guild_only_prompt = f"""
@@ -142,8 +153,10 @@ Information about your environment:
 
 {gpt_4_only_prompt}
 
+You MUST NOT use markdown on links. For example, if you want to link to https://devsky.one, you should write
+https://devsky.one instead of [https://devsky.one](https://devsky.one).
 Users can interact with you by mentioning you or replying to one of your messages.
-Note that you will respond using informal language (e.g., 'Du'-form in German, never ever use 'Sie').
+Note that you will respond using informal language (e.g., 'Du'-form in German, NEVER EVER use 'Sie').
 """}]
 
     if context:
@@ -189,7 +202,7 @@ async def check_for_questions(conversation, full_response, max_response_tokens, 
         asked_user_id = full_response[5:]
         asked_user_id = asked_user_id.strip()
         asked_user_infos = await get_user_information(asked_user_id)
-        conversation.append({"role": "user", "content": asked_user_infos})
+        conversation.append({"role": "assistant", "content": asked_user_infos})
         print("Asking back for user information for user", asked_user_id)
         await thinking_message.edit(content="Asking back for user information...",
                                     allowed_mentions=discord.AllowedMentions.none())
@@ -199,9 +212,32 @@ async def check_for_questions(conversation, full_response, max_response_tokens, 
                                          thinking_message, user)
     if full_response.startswith("(gi)"):  # Guild information
         guild_response = await get_guild_information(thinking_message.guild.id)
-        conversation.append({"role": "user", "content": f"We are currently in {guild_response}"})
+        conversation.append({"role": "assistant", "content": f"We are currently in {guild_response}"})
         print("Asking back for guild information")
         await thinking_message.edit(content="Asking back for guild information...",
+                                    allowed_mentions=discord.AllowedMentions.none())
+        full_response = await generate_openai_response(conversation, max_response_tokens, max_tokens, prompt_tokens,
+                                                       thinking_message, user)
+        return await check_for_questions(conversation, full_response, max_response_tokens, max_tokens, prompt_tokens,
+                                         thinking_message, user)
+
+    if full_response.startswith("(s)"):  # Web Search
+        query = full_response[4:]
+        query = query.strip()
+        query_results = await web_search(query)
+        # limit to 5 results
+        query_results["results"] = query_results["results"][:5]
+        # if query_results.success is true, results is a list of objects with the following attributes:
+        # title, url, desc
+        if query_results.get("success"):
+            conversation.append({"role": "assistant", "content": f"These search results are not visible to the user. Here are the results for '{query}':"})
+            for result in query_results.get("results"):
+                conversation.append({"role": "assistant", "content": f"{result.get('title')} ({result.get('url')})"})
+                conversation.append({"role": "assistant", "content": f"{result.get('desc')}"})
+        else:
+            conversation.append({"role": "assistant", "content": f"Sorry, I couldn't find anything for {query}."})
+        print("Searching on the internet", query)
+        await thinking_message.edit(content=f"Searching for {query}...",
                                     allowed_mentions=discord.AllowedMentions.none())
         full_response = await generate_openai_response(conversation, max_response_tokens, max_tokens, prompt_tokens,
                                                        thinking_message, user)
@@ -244,10 +280,15 @@ async def generate_openai_response(conversation, max_response_tokens, max_tokens
                             await thinking_message.edit(content=thinking_message_content,
                                                         allowed_mentions=discord.AllowedMentions.none())
     except RateLimitError as e:
+        sentry_sdk.capture_exception(e)
         print("Rate limit error:", e)
         full_response = "I'm sorry, but I'm currently rate limited (maybe consider using another model?)." \
                         " Please try again later."
+        if "The server had an error" in str(e):
+            full_response = "I'm sorry, but I'm currently experiencing technical difficulties. Please try again later."
+
     except Exception as e:
+        sentry_sdk.capture_exception(e)
         print("Error:", e)
         full_response = "I'm sorry, but I'm currently experiencing technical difficulties. Please try again later."
     return full_response
@@ -259,6 +300,12 @@ async def send_thinking_message(message):
 
 async def delete_thinking_message(wait_message):
     await wait_message.delete()
+
+
+async def web_search(query: str):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"https://search.flawcra.cc/safeq/{query}") as r:
+            return await r.json()
 
 
 async def new_bulk_text(text: str):
@@ -281,6 +328,7 @@ async def send_response(message, response):
             url = await new_bulk_text(response)
             response = f"I'm ready! But the message is too long for Discord.\nI uploaded it here for you: {url}"
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             print("Error uploading large message:", e)
             response = "I'm sorry, but I'm currently experiencing technical difficulties. Please try again later."
         await message.channel.send(response, reference=message, allowed_mentions=discord.AllowedMentions.none())
@@ -325,6 +373,7 @@ async def on_message(message):
     try:
         asyncio.create_task(generate_answer(context, message, thinking_message))
     except Exception as e:
+        sentry_sdk.capture_exception(e)
         await thinking_message.edit(content=f"An error occurred: {e}")
 
 
@@ -360,6 +409,7 @@ async def init_db() -> None:
             try:
                 await cursor.execute(query)
             except Exception as e:
+                sentry_sdk.capture_exception(e)
                 log.error(e)
                 continue
     pool.close()
