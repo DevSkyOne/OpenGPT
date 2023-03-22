@@ -105,10 +105,12 @@ async def generate_text(context=None, thinking_message: discord.Message = None, 
 
     gpt_4_only_prompt = """
     You can use the following commands to get more information about a user or this guild (server):
-     - (ui) for userinfo: Displays basic information about a user ex. `(ui) 123456789012345678`
-     - (gi) for guildinfo: Shows information about the current guild (server) ex. `(gi)`
-     - (s) for anything you don't currently know: Displays search results about the query that was given to the command ex. `(s) <generate a search query about the current question>`
-    You can only use these commands. Please respond with one command at a time without any additional content. THIS IS A MUST!
+     - (ui) for user info: Displays basic information about a user ex. `(ui) 123456789012345678`
+     - (gi) for guild info: Shows information about the current guild (server) ex. `(gi)`
+     - (s) for anything you don't currently know: Displays search results about the query that was given to the command
+        ex. `(s) <generate a search query about the current question>`
+    You can only use these commands. Please respond with one command at a time without any additional content.
+    THIS IS A MUST!
     """ if user.model == "gpt-4" else ""
 
     guild_only_prompt = f"""
