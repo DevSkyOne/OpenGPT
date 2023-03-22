@@ -230,7 +230,7 @@ async def check_for_questions(conversation, full_response, max_response_tokens, 
         # if query_results.success is true, results is a list of objects with the following attributes:
         # title, url, desc
         if query_results.get("success"):
-            conversation.append({"role": "assistant", "content": f"Here are the results for {query}:"})
+            conversation.append({"role": "assistant", "content": f"These search results are not visible to the user. Here are the results for '{query}':"})
             for result in query_results.get("results"):
                 conversation.append({"role": "assistant", "content": f"{result.get('title')} ({result.get('url')})"})
                 conversation.append({"role": "assistant", "content": f"{result.get('desc')}"})
