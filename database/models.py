@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from aiomysql import Pool
+from aiomysql import Pool, DictCursor
 
 from database.connection import get_pool
 
@@ -10,6 +10,8 @@ class UserData:
         self.user_id = user_id
         self.credits = 100
         self.model = 'gpt-3.5-turbo'
+        self.credits_spent = 0
+        self.prompt_amount = 0
         self.last_used = datetime.now()
         self.created = datetime.now()
         self.plans = []
@@ -22,7 +24,7 @@ class UserData:
         # Load data from database
         pool: Pool = await get_pool()
         async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
+            async with conn.cursor(DictCursor) as cur:
                 await cur.execute("SELECT * FROM users WHERE user_id = %s", (self.user_id,))
                 data = await cur.fetchone()
                 if data is None:
@@ -31,10 +33,12 @@ class UserData:
                     await conn.commit()
                     print("Created new user entry for user with id", self.user_id)
                     return self
-                self.credits = data[1]
-                self.model = data[2]
-                self.last_used = data[3]
-                self.created = data[4]
+                self.credits = data['credits']
+                self.model = data['model']
+                self.credits_spent = data['credits_spent']
+                self.prompt_amount = data['prompt_amount']
+                self.last_used = data['last_used']
+                self.created = data['created']
                 print("Loaded user entry for user with id", self.user_id)
 
         pool.close()
@@ -55,13 +59,13 @@ class UserData:
     async def load_plans(self):
         pool: Pool = await get_pool()
         async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
+            async with conn.cursor(DictCursor) as cur:
                 await cur.execute("SELECT * FROM user_plans WHERE user_id = %s", (self.user_id,))
                 data = await cur.fetchall()
                 if data is None:
                     return
                 for plan in data:
-                    self.plans.append(PlanData(plan[0], plan[1], plan[2], plan[3], plan[4]))
+                    self.plans.append(PlanData(plan['id'], plan['user_id'], plan['daily_credits'], plan['start_date'], plan['end_date']))
                 print(f"Loaded {len(self.plans)} plans for user with id", self.user_id)
         pool.close()
         await pool.wait_closed()
