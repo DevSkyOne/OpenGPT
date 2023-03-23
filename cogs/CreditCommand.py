@@ -15,7 +15,6 @@ class CreditCommand(commands.Cog):
     async def credits(self, ctx: ApplicationCommandInteraction):
         user_id = str(ctx.author.id)
         user = await get_user_data(user_id)
-        print(user)
 
         renew_at = user.last_used + datetime.timedelta(days=1)
 
