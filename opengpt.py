@@ -520,10 +520,8 @@ async def generate_answer(context, message, thinking_message):
 @bot.event
 async def on_ready():
     _log.info(f"{bot.user.name} has connected to Discord!")
-    _log.info('Creating database pool...')
-    bot.pool = UserData.pool = await get_pool()
 
-    
+
 async def init_db(pool: aiomysql.Pool) -> None:
     async with aiofiles.open("database/db_structure.sql", "r") as fp:
         struct = await fp.read()
@@ -543,6 +541,7 @@ async def init_db(pool: aiomysql.Pool) -> None:
 async def main():
     _log.info("Starting bot...")
     async with get_pool() as bot.pool:
+        _log.info('Checking database structure...')
         await init_db(bot.pool)
     
         cogs = [p.stem for p in Path('./cogs').glob('**/*.py') if not p.name.startswith('__')]
