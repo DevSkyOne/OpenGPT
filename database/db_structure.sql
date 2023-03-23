@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS users
 (
-    user_id         VARCHAR(45) NOT NULL,
+    user_id         VARCHAR(45) NOT NULL,  # Make this unique
     credits         INTEGER     DEFAULT 100,
     model           VARCHAR(45) DEFAULT 'gpt-3.5-turbo',
     credits_spent   INTEGER     DEFAULT 0,
